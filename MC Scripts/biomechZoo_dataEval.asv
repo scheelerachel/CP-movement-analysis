@@ -1,0 +1,366 @@
+% biomechZoo_dataEval.m
+%
+% Rachel Scheele
+% Last Edited 3/12/2025
+
+% Need script to:
+% Combine all MC participant data into one structure for further analysis
+
+% Clean workspace and command window
+clear;
+close all;
+clc;
+
+%% Load
+user = getenv('username');
+
+filepath = fullfile('C:\Users\', user, ['OneDrive - Marquette ' ...
+'University'], ['Documents - Pediatric Movement and ' ...
+'Neuroscience Lab (PMNL)'], 'R21_mHealthApp');
+
+filePF = fullfile(filepath,'Analysis\ViconMCdata\ParsedFrame');
+
+if exist(filepath, 'dir')==0
+    fprintf('Open R21_mHealthApp folder')
+    pause(3)
+    filepath = uigetdir;
+    filePF = fullfile(filepath,'Analysis\ViconMCdata\ParsedFrame');
+end
+
+fileGDA = fullfile(filepath,'Analysis\MATLAB scripts\population_game_data.mat');
+load(fileGDA);
+
+number = input("\nParticipant ID (case sensitive)\nMHEALTH",'s');
+participant = append('MHEALTH',number);
+matfile = append(participant,'.mat');
+
+fileGDI = fullfile(filepath,'Data\Game Data\Individual',participant);
+game = load(fileGDI);
+
+%% Organize data into structure
+alldata = struct();
+hand = game.AsteroidBelt.trial_hand;
+num = game.AsteroidBelt.trial_no;
+
+for i=1:length(hand)
+    visit = sprintf('V%d',ceil(i/12));
+    trialnum = mod(i-1,12) + 1;
+    trial = sprintf('trial_%02d',trialnum);
+    
+    fileData = fullfile(filePF,participant,visit,trial);
+    load(fileData);
+
+    if isequal(visit,'V1')
+        if isequal(hand(i),{'Right'})
+            alldata1(i).rsho_abduct = data.RShoulderKinemat.line(:,1);
+            alldata1(i).rsho_flex = data.RShoulderKinemat.line(:,2);
+            alldata1(i).rsho_horabduct = data.RShoulderKinemat.line(:,3);
+    
+            alldata1(i).relb_pronat = data.RElbowKinemat.line(:,1);
+            alldata1(i).relb_flex = sqrt(data.RElbowKinemat.line(:,2).^2 + data.RElbowKinemat.line(:,3).^2);
+    
+            alldata1(i).rwr_flex = data.RWristKinemat.line(:,2);
+            alldata1(i).rwr_rudev = data.RWristKinemat.line(:,3);
+    
+        elseif isequal(hand(i),{'Left'})
+            alldata1(i).lsho_abduct = data.LShoulderKinemat.line(:,1);
+            alldata1(i).lsho_flex = data.LShoulderKinemat.line(:,2);
+            alldata1(i).lsho_horabduct = data.LShoulderKinemat.line(:,3);
+    
+            alldata1(i).lelb_pronat = data.LElbowKinemat.line(:,1);
+            alldata1(i).lelb_flex = sqrt(data.LElbowKinemat.line(:,2).^2 + data.LElbowKinemat.line(:,3).^2);
+    
+            alldata1(i).lwr_flex = data.LWristKinemat.line(:,2);
+            alldata1(i).lwr_rudev = data.LWristKinemat.line(:,3);
+        end
+    elseif isequal(visit,'V2')
+        if isequal(hand(i),{'Right'})
+            alldata2(i).rsho_abduct = data.RShoulderKinemat.line(:,1);
+            alldata2(i).rsho_flex = data.RShoulderKinemat.line(:,2);
+            alldata2(i).rsho_horabduct = data.RShoulderKinemat.line(:,3);
+    
+            alldata2(i).relb_pronat = data.RElbowKinemat.line(:,1);
+            alldata2(i).relb_flex = sqrt(data.RElbowKinemat.line(:,2).^2 + data.RElbowKinemat.line(:,3).^2);
+    
+            alldata2(i).rwr_flex = data.RWristKinemat.line(:,2);
+            alldata2(i).rwr_rudev = data.RWristKinemat.line(:,3);
+    
+        elseif isequal(hand(i),{'Left'})
+            alldata2(i).lsho_abduct = data.LShoulderKinemat.line(:,1);
+            alldata2(i).lsho_flex = data.LShoulderKinemat.line(:,2);
+            alldata2(i).lsho_horabduct = data.LShoulderKinemat.line(:,3);
+    
+            alldata2(i).lelb_pronat = data.LElbowKinemat.line(:,1);
+            alldata2(i).lelb_flex = sqrt(data.LElbowKinemat.line(:,2).^2 + data.LElbowKinemat.line(:,3).^2);
+    
+            alldata2(i).lwr_flex = data.LWristKinemat.line(:,2);
+            alldata2(i).lwr_rudev = data.LWristKinemat.line(:,3);
+        end
+    end
+end
+
+%% Determine Handedness
+for i=1:length(game_data_all)
+    if game_data_all(i).ID == participant
+        age = game_data_all(i).Chron_Age;
+        sex = game_data_all(i).Sex;
+        diagnosis = game_data_all(i).Diagnosis;
+        non_pref = game_data_all(i).NonPrefered_Hand;
+        pref = game_data_all(i).Prefered_Hand;
+    end
+end
+
+%% Select Joint
+selection = menu('Select Joint', 'Shoulder Ab/Adduction', ...
+    'Shoulder Flexion/Extension', 'Shoulder Horizontal Ab/Aduction', ...
+    'Elbow Pronation/Supination', 'Elbow Flexion/Extension', ...
+    'Wrist Flexion/Extension', 'Wrist Radial/Ulnar Deviation','ALL');
+
+if selection == 8
+    for k=1:7
+        run_joint_case(k,pref,alldata1,alldata2,participant,filepath);
+    end
+else
+    run_joint_case(selection,pref,alldata1,alldata2,participant,filepath);
+end
+
+function run_joint_case(selection,pref,alldata1,alldata2,participant,filepath)
+    switch selection
+        case 1 % Shoulder Ab/Adduction
+            joint = 'sho_abduct';
+            joint_name = 'Shoulder Ab/Adduction';
+        case 2 % Shoulder Flex/Extend
+            joint = 'sho_flex';
+            joint_name = 'Shoulder Flexion/Extension';
+        case 3 % Shoulder Horizontal Ab/Aduction
+            joint = 'sho_horabduct';
+            joint_name = 'Shoulder Horizontal Ab/Adduction';
+        case 4 % Elbow Pronate/Supinate
+            joint = 'elb_pronat';
+            joint_name = 'Elbow Pronation/Supination';
+        case 5 % Elbow Flex/Extend
+            joint = 'elb_flex';
+            joint_name = 'Elbow Flexion/Extension';
+        case 6 % Wrist Flex/Extend
+            joint = 'wr_flex';
+            joint_name = 'Wrist Flexion/Extension';
+        case 7 % Wrist Radial/Ulnar Dev
+            joint = 'wr_rudev';
+            joint_name = 'Wrist Radial/Ulnar Deviation';
+    end
+    
+    %% Calculate Average and standardize
+    if isequal(pref,'Left')
+        njoint = append('r',joint);
+        djoint = append('l',joint);
+    elseif isequal(pref,'Right')
+        djoint = append('r',joint);
+        njoint = append('l',joint);
+    else
+        fprintf('Error in handedness\n')
+    end
+    
+    nPoints = 2000;
+    
+    [dom_leftMat1,dom_rightMat1,dom_leftMean1,dom_rightMean1,dom_leftSD1,dom_rightSD1] = processjoint(alldata1,djoint,nPoints);
+    [non_leftMat1,non_rightMat1,non_leftMean1,non_rightMean1,non_leftSD1,non_rightSD1] = processjoint(alldata1,njoint,nPoints);
+    
+    [dom_leftMat2,dom_rightMat2,dom_leftMean2,dom_rightMean2,dom_leftSD2,dom_rightSD2] = processjoint(alldata2,djoint,nPoints);
+    [non_leftMat2,non_rightMat2,non_leftMean2,non_rightMean2,non_leftSD2,non_rightSD2] = processjoint(alldata2,njoint,nPoints);
+    
+    %% Range of motion
+    % Print ROM Dominant V1
+    dom_lowbd = min([dom_leftMean1,dom_rightMean1]);
+    dom_upbd = max([dom_leftMean1,dom_rightMean1]);
+    dom_diff = abs(dom_upbd - dom_lowbd);
+    fprintf('\nROM for Dominant V1 %s: %2.2f degrees\n',joint_name,dom_diff)
+    
+    % Print ROM Non-Dominant V1
+    non_lowbd = min([non_leftMean1,non_rightMean1]);
+    non_upbd = max([non_leftMean1,non_rightMean1]);
+    non_diff = abs(non_upbd - non_lowbd);
+    fprintf('ROM for Non-Dominant V1 %s: %2.2f degrees\n',joint_name,non_diff)
+
+    % Print ROM Dominant V2
+    dom_lowbd = min([dom_leftMean2,dom_rightMean2]);
+    dom_upbd = max([dom_leftMean2,dom_rightMean2]);
+    dom_diff = abs(dom_upbd - dom_lowbd);
+    fprintf('ROM for Dominant V2 %s: %2.2f degrees\n',joint_name,dom_diff)
+    
+    % Print ROM Non-Dominant V2
+    non_lowbd = min([non_leftMean2,non_rightMean2]);
+    non_upbd = max([non_leftMean2,non_rightMean2]);
+    non_diff = abs(non_upbd - non_lowbd);
+    fprintf('ROM for Non-Dominant V2 %s: %2.2f degrees\n',joint_name,non_diff)
+
+    %% Save data in Structure
+    joints = {'sho_abduct','sho_flex','sho_horabduct', ...
+        'elb_pronat','elb_flex','wr_flex','wr_rudev','ROM'};
+    
+    sample = {'MHEALTH110','MHEALTH118','MHEALTH126','MHEALTH130',...
+        'MHEALTH135','MHEALTH136','MHEALTH137','MHEALTH138',...
+        'MHEALTH139','MHEALTH141','MHEALTH203','MHEALTH204',...
+        'MHEALTH205','MHEALTH207','MHEALTH208','MHEALTH212','MHEALTH214'};
+    
+    filesv = fullfile(filepath,'Analysis\MATLAB scripts\MCdata_joints.mat');
+   
+    if exist(filesv,'file')
+        load(filesv)
+    else
+        for i=1:numel(joints)
+            MCdata_joints.(joints{i}) = repmat(struct('ID', "", ...
+                'dom_LR_1', [],'dom_RL_1', [],'non_LR_1', [], ...
+                'non_RL_1', [],'dom_LR_2', [],'dom_RL_2', [], ...
+                'non_LR_2', [],'non_RL_2', []), numel(sample), 1);
+            for j=1:numel(sample)
+                MCdata_joints.(joints{i})(j).ID = sample{j};
+            end
+        end
+
+        MCdata_joints.ROM = repmat(struct('ID', "", ...
+            'dom_LR_1', [],'dom_RL_1', [],'non_LR_1', [], ...
+            'non_RL_1', [],'dom_LR_2', [],'dom_RL_2', [], ...
+            'non_LR_2', [],'non_RL_2', []), numel(sample), 1);
+
+    end % only runs on first iteration
+    
+    ind = find(strcmp({MCdata_joints.(joint).ID},participant));
+
+    MCdata_joints.(joint)(ind).dom_LR_1 = dom_leftMat1;
+    MCdata_joints.(joint)(ind).dom_RL_1 = dom_rightMat1;
+    MCdata_joints.(joint)(ind).non_LR_1 = non_leftMat1;
+    MCdata_joints.(joint)(ind).non_RL_1 = non_rightMat1;
+    
+    MCdata_joints.(joint)(ind).dom_LR_2 = dom_leftMat2;
+    MCdata_joints.(joint)(ind).dom_RL_2 = dom_rightMat2;
+    MCdata_joints.(joint)(ind).non_LR_2 = non_leftMat2;
+    MCdata_joints.(joint)(ind).non_RL_2 = non_rightMat2;
+
+    MCdata_joints.ROM.(joint)(ind).dom_LR_1 = dom_leftMat1;
+    MCdata_joints.ROM.(joint)(ind).dom_RL_1 = dom_rightMat1;
+    MCdata_joints.ROM.(joint)(ind).non_LR_1 = non_leftMat1;
+    MCdata_joints.ROM.(joint)(ind).non_RL_1 = non_rightMat1;
+    
+    MCdata_joints.ROM.(joint)(ind).dom_LR_2 = dom_leftMat2;
+    MCdata_joints.ROM.(joint)(ind).dom_RL_2 = dom_rightMat2;
+    MCdata_joints.ROM.(joint)(ind).non_LR_2 = non_leftMat2;
+    MCdata_joints.ROM.(joint)(ind).non_RL_2 = non_rightMat2;
+    
+    save(filesv,'MCdata_joints');
+    
+    %% Plot Individual
+    fig = 1;
+    if fig == 1
+        figure
+        x = linspace(0,1,nPoints);
+        
+        % TOP LEFT subplot
+        ax1 = subplot(2,2,1);
+        hold(ax1,'on')
+        title(ax1,'Left to Right vs. Right to Left of Dominant Limb V1 TL')
+        xlabel(ax1,'Normalized Time')
+        ylabel(ax1,'Degrees')
+        
+        plot(ax1,x,dom_leftMat1','Color',[0.8 0.8 1])   % left trials
+        plot(ax1,x,dom_rightMat1','Color',[1 0.8 0.8])  % right trials
+        
+        hSD_L1 = fill(ax1,[x fliplr(x)],...
+            [dom_leftMean1-dom_leftSD1 fliplr(dom_leftMean1+dom_leftSD1)],...
+            'b','FaceAlpha',0.15,'EdgeColor','none');
+        
+        hSD_R1 = fill(ax1,[x fliplr(x)],...
+            [dom_rightMean1-dom_rightSD1 fliplr(dom_rightMean1+dom_rightSD1)],...
+            'r','FaceAlpha',0.15,'EdgeColor','none');
+        
+        uistack(hSD_L1,'bottom')
+        uistack(hSD_R1,'bottom')
+        
+        hMean_L1 = plot(ax1,x,dom_leftMean1,'b','LineWidth',3);
+        hMean_R1 = plot(ax1,x,dom_rightMean1,'r','LineWidth',3);
+        
+        legend(ax1,[hMean_L1 hMean_R1],{'L→R Mean','R→L Mean'},'Location','best')
+        
+        % BOTTOM LEFT Subplot
+        
+        ax2 = subplot(2,2,3);
+        hold(ax2,'on')
+        title('Left to Right vs. Right to Left of Non-Dominant Limb V1 BL')
+        xlabel('Normalized Time')
+        ylabel('Degrees')
+        
+        plot(ax2,x,non_leftMat1','Color',[0.8 0.8 1])
+        plot(ax2,x,non_rightMat1','Color',[1 0.8 0.8])
+        
+        hSD_L2 = fill(ax2,[x fliplr(x)],...
+            [non_leftMean1-non_leftSD1 fliplr(non_leftMean1+non_leftSD1)],...
+            'b','FaceAlpha',0.15,'EdgeColor','none');
+        
+        hSD_R2 = fill(ax2,[x fliplr(x)],...
+            [non_rightMean1-non_rightSD1 fliplr(non_rightMean1+non_rightSD1)],...
+            'r','FaceAlpha',0.15,'EdgeColor','none');
+        
+        uistack(hSD_L2,'bottom')
+        uistack(hSD_R2,'bottom')
+        
+        hMean_L2 = plot(ax2,x,non_leftMean1,'b','LineWidth',3);
+        hMean_R2 = plot(ax2,x,non_rightMean1,'r','LineWidth',3);
+        
+        legend(ax2,[hMean_L2 hMean_R2],{'L→R Mean','R→L Mean'},'Location','best')
+
+        % TOP RIGHT subplot
+        ax3 = subplot(2,2,2);
+        hold(ax3,'on')
+        title(ax3,'Left to Right vs. Right to Left of Dominant Limb V2 TR')
+        xlabel(ax3,'Normalized Time')
+        ylabel(ax3,'Degrees')
+        
+        plot(ax3,x,dom_leftMat2','Color',[0.8 0.8 1])   % left trials
+        plot(ax3,x,dom_rightMat2','Color',[1 0.8 0.8])  % right trials
+        
+        hSD_L1 = fill(ax3,[x fliplr(x)],...
+            [dom_leftMean2-dom_leftSD2 fliplr(dom_leftMean2+dom_leftSD2)],...
+            'b','FaceAlpha',0.15,'EdgeColor','none');
+        
+        hSD_R1 = fill(ax3,[x fliplr(x)],...
+            [dom_rightMean2-dom_rightSD2 fliplr(dom_rightMean2+dom_rightSD2)],...
+            'r','FaceAlpha',0.15,'EdgeColor','none');
+        
+        uistack(hSD_L1,'bottom')
+        uistack(hSD_R1,'bottom')
+        
+        hMean_L2 = plot(ax3,x,dom_leftMean2,'b','LineWidth',3);
+        hMean_R2 = plot(ax3,x,dom_rightMean2,'r','LineWidth',3);
+        
+        legend(ax3,[hMean_L2 hMean_R2],{'L→R Mean','R→L Mean'},'Location','best')
+        
+        % BOTTOM RIGHT Subplot
+        
+        ax4 = subplot(2,2,4);
+        hold(ax4,'on')
+        title('Left to Right vs. Right to Left of Non-Dominant Limb V2 BR')
+        xlabel('Normalized Time')
+        ylabel('Degrees')
+        
+        plot(ax4,x,non_leftMat2','Color',[0.8 0.8 1])
+        plot(ax4,x,non_rightMat2','Color',[1 0.8 0.8])
+        
+        hSD_L2 = fill(ax4,[x fliplr(x)],...
+            [non_leftMean2-non_leftSD2 fliplr(non_leftMean2+non_leftSD2)],...
+            'b','FaceAlpha',0.15,'EdgeColor','none');
+        
+        hSD_R2 = fill(ax4,[x fliplr(x)],...
+            [non_rightMean2-non_rightSD2 fliplr(non_rightMean2+non_rightSD2)],...
+            'r','FaceAlpha',0.15,'EdgeColor','none');
+        
+        uistack(hSD_L2,'bottom')
+        uistack(hSD_R2,'bottom')
+        
+        hMean_L2 = plot(ax4,x,non_leftMean2,'b','LineWidth',3);
+        hMean_R2 = plot(ax4,x,non_rightMean2,'r','LineWidth',3);
+        
+        legend(ax4,[hMean_L2 hMean_R2],{'L→R Mean','R→L Mean'},'Location','best')
+        
+        sgtitle(joint_name)
+    end
+    
+end
